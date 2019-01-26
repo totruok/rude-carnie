@@ -1,13 +1,11 @@
-from detect import ObjectDetector
-
+import cv2
 import numpy as np
 import tensorflow as tf
-import cv2
+
+from .detect import ObjectDetector
+
 
 class YOLOBase(ObjectDetector):
-    def __init__(self):
-        pass
-
     def _conv_layer(self, idx, inputs, filters, size, stride):
         channels = inputs.get_shape()[3]
         weight = tf.Variable(tf.truncated_normal([size, size, int(channels), filters], stddev=0.1))
@@ -90,6 +88,9 @@ class YOLOBase(ObjectDetector):
 
     def run(self, filename):
         img = cv2.imread(filename)
+        return self.run_img(img)
+
+    def run_img(self, img):
         self.h_img, self.w_img, _ = img.shape
         img_resized = cv2.resize(img, (448, 448))
         img_RGB = cv2.cvtColor(img_resized, cv2.COLOR_BGR2RGB)
@@ -120,6 +121,7 @@ class YOLOBase(ObjectDetector):
         self.basename = basename
         self.tgtdir = tgtdir
         self.load_model(model_name)
+
 
 class PersonDetectorYOLOTiny(YOLOBase):
     def __init__(self, model_name, basename='frontal-face', tgtdir='.', alpha=0.1, threshold=0.2, iou_threshold=0.5):
@@ -200,6 +202,7 @@ class PersonDetectorYOLOTiny(YOLOBase):
 
         return result
 
+
 # This model doesnt seem to work particularly well on data I have tried
 class FaceDetectorYOLO(YOLOBase):
     def __init__(self, model_name, basename='frontal-face', tgtdir='.', alpha=0.1, threshold=0.2, iou_threshold=0.5):
@@ -279,5 +282,3 @@ class FaceDetectorYOLO(YOLOBase):
                            probs_filtered[i]])
 
         return result
-
-

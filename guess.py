@@ -2,21 +2,15 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from datetime import datetime
-import math
-import time
-from data import inputs
-import numpy as np
-import tensorflow as tf
-from model import select_model, get_checkpoint
-from utils import *
-import os
-import json
 import csv
+import os
+
+from .model import select_model, get_checkpoint
+from .utils import *
 
 RESIZE_FINAL = 227
-GENDER_LIST =['M','F']
-AGE_LIST = ['(0, 2)','(4, 6)','(8, 12)','(15, 20)','(25, 32)','(38, 43)','(48, 53)','(60, 100)']
+GENDER_LIST = ['M', 'F']
+AGE_LIST = ['(0, 2)', '(4, 6)', '(8, 12)', '(15, 20)', '(25, 32)', '(38, 43)', '(48, 53)', '(60, 100)']
 MAX_BATCH_SZ = 128
 
 tf.app.flags.DEFINE_string('model_dir', '',
@@ -24,7 +18,6 @@ tf.app.flags.DEFINE_string('model_dir', '',
 
 tf.app.flags.DEFINE_string('class_type', 'age',
                            'Classification type (age|gender)')
-
 
 tf.app.flags.DEFINE_string('device_id', '/cpu:0',
                            'What processing unit to execute inference on')
@@ -36,7 +29,7 @@ tf.app.flags.DEFINE_string('target', '',
                            'CSV file containing the filename processed along with best guess and score')
 
 tf.app.flags.DEFINE_string('checkpoint', 'checkpoint',
-                          'Checkpoint basename')
+                           'Checkpoint basename')
 
 tf.app.flags.DEFINE_string('model_type', 'default',
                            'Type of convnet')
@@ -51,8 +44,10 @@ tf.app.flags.DEFINE_string('face_detection_type', 'cascade', 'Face detection mod
 
 FLAGS = tf.app.flags.FLAGS
 
+
 def one_of(fname, types):
     return any([fname.endswith('.' + ty) for ty in types])
+
 
 def resolve_file(fname):
     if os.path.exists(fname): return fname
@@ -70,11 +65,11 @@ def classify_many_single_crop(sess, label_list, softmax_output, coder, images, i
         for j in range(num_batches):
             start_offset = j * MAX_BATCH_SZ
             end_offset = min((j + 1) * MAX_BATCH_SZ, len(image_files))
-            
+
             batch_image_files = image_files[start_offset:end_offset]
             print(start_offset, end_offset, len(batch_image_files))
             image_batch = make_multi_image_batch(batch_image_files, coder)
-            batch_results = sess.run(softmax_output, feed_dict={images:image_batch.eval()})
+            batch_results = sess.run(softmax_output, feed_dict={images: image_batch.eval()})
             batch_sz = batch_results.shape[0]
             for i in range(batch_sz):
                 output_i = batch_results[i]
@@ -90,24 +85,25 @@ def classify_many_single_crop(sess, label_list, softmax_output, coder, images, i
         print(e)
         print('Failed to run all images')
 
+
 def classify_one_multi_crop(sess, label_list, softmax_output, coder, images, image_file, writer):
     try:
 
         print('Running file %s' % image_file)
         image_batch = make_multi_crop_batch(image_file, coder)
 
-        batch_results = sess.run(softmax_output, feed_dict={images:image_batch.eval()})
+        batch_results = sess.run(softmax_output, feed_dict={images: image_batch.eval()})
         output = batch_results[0]
         batch_sz = batch_results.shape[0]
-    
+
         for i in range(1, batch_sz):
             output = output + batch_results[i]
-        
+
         output /= batch_sz
         best = np.argmax(output)
         best_choice = (label_list[best], output[best])
         print('Guess @ 1 %s, prob = %.2f' % best_choice)
-    
+
         nlabels = len(label_list)
         if nlabels > 2:
             output[best] = 0
@@ -120,6 +116,7 @@ def classify_one_multi_crop(sess, label_list, softmax_output, coder, images, ima
         print(e)
         print('Failed to run image %s ' % image_file)
 
+
 def list_images(srcfile):
     with open(srcfile, 'r') as csvfile:
         delim = ',' if srcfile.endswith('.csv') else '\t'
@@ -127,13 +124,14 @@ def list_images(srcfile):
         if srcfile.endswith('.csv') or srcfile.endswith('.tsv'):
             print('skipping header')
             _ = next(reader)
-        
+
         return [row[0] for row in reader]
+
 
 def main(argv=None):  # pylint: disable=unused-argument
 
     files = []
-    
+
     if FLAGS.face_detection_model:
         print('Using face detector (%s) %s' % (FLAGS.face_detection_type, FLAGS.face_detection_model))
         face_detect = face_detection_model(FLAGS.face_detection_type, FLAGS.face_detection_model)
@@ -151,20 +149,20 @@ def main(argv=None):  # pylint: disable=unused-argument
         model_fn = select_model(FLAGS.model_type)
 
         with tf.device(FLAGS.device_id):
-            
+
             images = tf.placeholder(tf.float32, [None, RESIZE_FINAL, RESIZE_FINAL, 3])
             logits = model_fn(nlabels, images, 1, False)
             init = tf.global_variables_initializer()
-            
+
             requested_step = FLAGS.requested_step if FLAGS.requested_step else None
-        
+
             checkpoint_path = '%s' % (FLAGS.model_dir)
 
             model_checkpoint_path, global_step = get_checkpoint(checkpoint_path, requested_step, FLAGS.checkpoint)
-            
+
             saver = tf.train.Saver()
             saver.restore(sess, model_checkpoint_path)
-                        
+
             softmax_output = tf.nn.softmax(logits)
 
             coder = ImageCoder()
@@ -174,8 +172,9 @@ def main(argv=None):  # pylint: disable=unused-argument
                 if (os.path.isdir(FLAGS.filename)):
                     for relpath in os.listdir(FLAGS.filename):
                         abspath = os.path.join(FLAGS.filename, relpath)
-                        
-                        if os.path.isfile(abspath) and any([abspath.endswith('.' + ty) for ty in ('jpg', 'png', 'JPG', 'PNG', 'jpeg')]):
+
+                        if os.path.isfile(abspath) and any(
+                                [abspath.endswith('.' + ty) for ty in ('jpg', 'png', 'JPG', 'PNG', 'jpeg')]):
                             print(abspath)
                             files.append(abspath)
                 else:
@@ -183,7 +182,7 @@ def main(argv=None):  # pylint: disable=unused-argument
                     # If it happens to be a list file, read the list and clobber the files
                     if any([FLAGS.filename.endswith('.' + ty) for ty in ('csv', 'tsv', 'txt')]):
                         files = list_images(FLAGS.filename)
-                
+
             writer = None
             output = None
             if FLAGS.target:
@@ -202,6 +201,7 @@ def main(argv=None):  # pylint: disable=unused-argument
 
             if output is not None:
                 output.close()
-        
+
+
 if __name__ == '__main__':
     tf.app.run()

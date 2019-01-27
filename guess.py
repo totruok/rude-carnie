@@ -92,7 +92,7 @@ def classify_one_multi_crop(sess, label_list, softmax_output, coder, images, ima
         print('Running file %s' % image_file)
         image_batch = make_multi_crop_batch(image_file, coder)
 
-        batch_results = sess.run(softmax_output, feed_dict={images: image_batch.eval()})
+        batch_results = sess.run(softmax_output, feed_dict={images: image_batch.eval(session=sess)})
         output = batch_results[0]
         batch_sz = batch_results.shape[0]
 

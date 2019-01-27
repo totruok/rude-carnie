@@ -161,7 +161,7 @@ def make_multi_crop_batch(filename, coder):
         crops.append(standardize_image(flipped))
 
     image_batch = tf.stack(crops)
-    return image_batch
+    return coder._sess.run(image_batch)
 
 
 def face_detection_model(model_type, model_path):

@@ -103,7 +103,7 @@ def classify_one_multi_crop(sess, label_list, softmax_output, coder, images, ima
         best = np.argmax(output)
         best_choice = (label_list[best], output[best])
         print('Guess @ 1 %s, prob = %.2f' % best_choice)
-
+        return best_choice
         nlabels = len(label_list)
         if nlabels > 2:
             output[best] = 0
